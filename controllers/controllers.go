@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"ecommerce/database"
 	"ecommerce/models"
 	"fmt"
 	"log"
@@ -9,15 +10,40 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
 
+var UserCollection *mongo.Collection = database.UserData(database.Client, "Users")
+var ProductCollection *mongo.Collection = database.ProductData(database.Client, "Products")
+var Validate = validator.New()
+
 func HashPassword(password string) string {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return string(bytes)
 
 }
 
 func verifyPassword(userPassword string, givenPassword string) (bool, string) {
+
+	err := bcrypt.CompareHashAndPassword([]byte(givenPassword), []byte(userPassword))
+	valid := true
+	msg := ""
+
+	if err != nil {
+		msg = "Login or Password is incorrect"
+		valid = false
+	}
+
+	return valid, msg
 
 }
 
@@ -37,7 +63,7 @@ func Signup() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": validationErr})
 		}
 
-		count, err := UserCollection.CountDocuments(cxt, bson.M{"email": user.Email})
+		count, err := UserCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 		if err != nil {
 			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
@@ -49,7 +75,7 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
-		count, err = UserCollection.CountDocuments(cxt, bson.M{"phone": user.Phone})
+		count, err = UserCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
 		if err != nil {
 			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
